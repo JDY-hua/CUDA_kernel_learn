@@ -74,4 +74,34 @@ relu.prof：生成的性能分析报告文件名。Nsight Systems 将生成一�
 
 实验得到的现象：8196*8196还是正常的，但是8200*8200就开始不正常了。（这是为什么呢？）
 
-## 
+## transpose算子
+### 实现思路
+- 需要先得到每个维度的strides，然后从out向input转换，基本即先从dims转成offset，然后permute再转为offset，然后赋值即可
+- 核心代码：  
+```
+if (tid < nums) {
+        int offset_out = tid;
+        int offset_tmp = offset_out;
+        int offset_in = 0;
+        for (int i = 0; i < NUM_DIMS; ++i) {
+            offset_in += (offset_tmp / strides_out[i]) * strides_in[permute[i]];
+            offset_tmp %= strides_out[i];
+        }
+        out_data[offset_out] = in_data[offset_in];
+    }
+```
+- 优化思路：  
+    1、加大计算强度，一个线程计算多个位置
+    2、使用shared_mem
+    3、消除bank_flict
+
+## 测试显存带宽
+### 计算公式
+以4090为例，其显存为GDDR6X,核心频率为21000MHz(21GHz),位宽为384bits  
+*--GDDR(Graphics Double Data Rate):通过在时钟信号的上升沿和下降沿都进行数据传输，实现了双倍的数据传输速率*  
+*--在过去的某些GDDR5和GDDR5X等内存技术中，由于它们采用了双倍数据速率（DDR）技术，在每个时钟周期的上升沿和下降沿都传输数据，因此计算带宽时会考虑到这一点。但是，对于GDDR6X，虽然它也基于DDR原理，但其PAM4调制方式已经改变了数据传输的方式，所以不再简单地应用“乘2”的规则*  
+公式为：显存带宽 = （核心频率*位宽）/8  
+则4090带宽为：21*384/8 = 1008GB/s
+### 实际测试
+- 使用向量加的的低计算强度算子进行带宽测试
+- BandWidth_test下：实测为955.852352GB/s

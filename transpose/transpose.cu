@@ -38,44 +38,34 @@ __global__ void transpose_naive_kernel(T* in_data, T* out_data,
     int* strides_in, int* strides_out,
     int* permute, int nums);
 
-// 测试用例
 void test_transpose_naive_op() {
-    // 定义输入和输出的shape
     vector<int> in_shape = {128, 32, 256, 256};
     vector<int> out_shape = {128, 32, 256, 256};
     vector<int> permute = {0, 1, 3, 2};
 
-    // 计算输入数据的总元素个数
     int num_elements = 1;
     for (int dim : in_shape) {
         num_elements *= dim;
     }
 
-    // 创建输入数据
     thrust::host_vector<float> h_in_data(num_elements);
     for (int i = 0; i < num_elements; ++i) {
         h_in_data[i] = static_cast<float>(i);
     }
 
-    // 创建输出数据
     thrust::host_vector<float> h_out_data(num_elements);
 
-    // 将输入数据复制到设备
     thrust::device_vector<float> d_in_data = h_in_data;
     thrust::device_vector<float> d_out_data = h_out_data;
 
-    // 调用transpose_naive_op函数
     bool success = transpose_naive_op(
         thrust::raw_pointer_cast(d_in_data.data()),
         thrust::raw_pointer_cast(d_out_data.data()),
         in_shape, out_shape, permute);
 
-    // 将输出数据复制回主机
     thrust::copy(d_out_data.begin(), d_out_data.end(), h_out_data.begin());
 
-    // 验证输出结果
     if (success) {
-        // 计算期望的输出数据
         thrust::host_vector<float> expected_out_data(num_elements);
         int idx = 0;
         for (int b = 0; b < in_shape[0]; ++b) {
@@ -91,7 +81,6 @@ void test_transpose_naive_op() {
             }
         }
 
-        // 比较实际输出和期望输出
         for (int i = 0; i < num_elements; ++i) {
             assert(h_out_data[i] == expected_out_data[i]);
         }
